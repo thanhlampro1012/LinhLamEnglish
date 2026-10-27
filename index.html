@@ -3008,10 +3008,45 @@ function copyTextSync(t){
 }
 const jsonRepair=t=>String(t||'').replace(/^\s*```(?:json)?/i,'').replace(/```\s*$/,'').replace(/[“”]/g,'"').replace(/,\s*([}\]])/g,'$1').trim();
 
-const GEM_OK=n=>/^gemini-(\d+(?:\.\d+)?)-(flash|flash-lite|pro)(-latest|-preview(?:-[\w-]+)?|-\d{3})?$/.test(n)||/^gemini-(flash|flash-lite|pro)-latest$/.test(n);
+const GEM_OK=n=>!/(tts|audio|image|imagen|live|embed|vision|aqa|robotics|computer|native|thinking-exp|learnlm|veo|nano)/i.test(n)&&(/^gemini-(\d+(?:\.\d+)?)-(flash|flash-lite|pro)(-latest|-\d{3}|-preview(?:-\d{2}-\d{2}|-\d{4}(?:-\d{2})?)?)?$/.test(n)||/^gemini-(flash|flash-lite|pro)-latest$/.test(n));
 const gemRank=n=>{const v=(n.match(/gemini-(\d+(?:\.\d+)?)/)||[0,0])[1]*1;const pre=/preview|exp/.test(n);let r=/flash-lite/.test(n)?600:/flash/.test(n)?1000:/pro/.test(n)?100:0;if(/^gemini-flash-latest$/.test(n))r=1000+v;if(/^gemini-flash-lite-latest$/.test(n))r=600;return r+v*10-(pre?300:0)-(/-latest$/.test(n)&&v?5:0);};
 const sleepMs=ms=>new Promise(r=>setTimeout(r,ms));
 Object.assign(app,{
+ /* Gọi mạng có giới hạn thời gian + nhớ cách kết nối chạy được */
+ async gemFetch(path,body){
+  const key=this.gemKey();const base='https://generativelanguage.googleapis.com/v1beta/'+path;const sep=base.includes('?')?'&':'?';const q=base+sep+'key='+encodeURIComponent(key);
+  const variants=body?[[base,{method:'POST',headers:{'Content-Type':'application/json','x-goog-api-key':key},body}],[q,{method:'POST',headers:{'Content-Type':'application/json'},body}],[q,{method:'POST',body}]]:[[q,{}],[base,{headers:{'x-goog-api-key':key}}]];
+  const pref=body?this._gemVarPost:this._gemVarGet;const order=pref!=null?[pref,...variants.map((_,i)=>i).filter(i=>i!==pref)]:variants.map((_,i)=>i);
+  const ms=this._gemTO||(body?(body.length>3000?180000:60000):12000);let last;
+  for(const i of order){const ctl=typeof AbortController!=='undefined'?new AbortController():null;const t=ctl?setTimeout(()=>ctl.abort(),ms):null;
+   try{const r=await fetch(variants[i][0],Object.assign({},variants[i][1],ctl?{signal:ctl.signal}:{}));if(body)this._gemVarPost=i;else this._gemVarGet=i;return r;}
+   catch(e){if(e&&e.name==='AbortError'){throw Object.assign(new Error('Gemini phản hồi quá chậm'),{status:504,timeout:true});}last=e;}
+   finally{if(t)clearTimeout(t);}}
+  const err=new Error(GEM_NET_MSG);err.net=true;err.cause=last;throw err;
+ },
+ async saveGemini(){
+  const msg=$('gem-msg');const k=cleanKey(($('set-gkey')||{}).value);const say=(h,c='text-brand-600')=>{const m=$('gem-msg');if(m)m.innerHTML=`<span class="${c}">${h}</span>`;};
+  if(!k)return say('Hãy dán Gemini API key.','text-rose-600');
+  if(typeof FIREBASE_CONFIG!=='undefined'&&FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey===k)return say('Đây là apiKey của Firebase (đồng bộ), không phải key Gemini. Hãy tạo key tại aistudio.google.com/apikey.','text-rose-600');
+  if(this._gemSaving)return;this._gemSaving=true;const btn=document.querySelector('#set-ai button[onclick="app.saveGemini()"]');if(btn)btn.disabled=true;
+  try{localStorage.setItem(GEM_KEY_STORE,k);}catch(e){}this._gemVarPost=this._gemVarGet=null;
+  const sel=($('set-gmodel')||{}).value;if(['auto','flash','lite','pro'].includes(sel))this.data.prefs.geminiChoice=sel;
+  const prev=this.data.prefs.aiProvider;const t0=Date.now();
+  try{
+   say('<i class="fa-solid fa-spinner fa-spin"></i> Bước 1/2: kiểm tra key…');
+   let ms=null;try{this._gemTO=10000;ms=await this.listGeminiModels();}catch(e){if(/không hợp lệ/.test(e.message)){try{localStorage.removeItem(GEM_KEY_STORE);}catch(x){}return say(`${esc(e.message)} Hãy sao chép lại key từ aistudio.google.com/apikey.`,'text-rose-600');}if(e.net){const test=`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(k)}`;const m=$('gem-msg');if(m)m.innerHTML=`<div class="text-rose-600 space-y-1.5"><p>${esc(e.message)}</p><p class="text-slate-500">Kiểm tra nhanh: <a class="underline text-brand-600" target="_blank" rel="noopener" href="${esc(test)}">mở link này</a>. Thấy chữ <code>"models"</code> = key & mạng ổn → nguyên nhân là tiện ích chặn trong trình duyệt.</p></div>`;return;}}
+   if(ms&&ms.length)this.data.prefs.geminiModels=ms;
+   this.data.prefs.aiProvider='gemini';this.save();
+   say(`<i class="fa-solid fa-circle-check"></i> Key hợp lệ & đã lưu. <i class="fa-solid fa-spinner fa-spin"></i> Bước 2/2: thử trả lời…`,'text-emerald-600');
+   this._gemTO=10000;this._gemProgress=(m,i)=>say(`<i class="fa-solid fa-circle-check"></i> Key hợp lệ & đã lưu. <i class="fa-solid fa-spinner fa-spin"></i> Bước 2/2: thử mô hình ${esc(m)}${i?` (lần ${i+1})`:''}…`,'text-emerald-600');
+   const r=await this.geminiCall({contents:[{role:'user',parts:[{text:'Reply with exactly: OK'}]}],maxTries:3});
+   const sec=((Date.now()-t0)/1000).toFixed(1);this._gemProgress=null;this._gemTO=null;
+   this.openSettings('ai');say(`<i class="fa-solid fa-circle-check"></i> Key hoạt động · mô hình ${esc(this.data.prefs.geminiModel)} · ${sec} giây (${esc((r.text||'').trim().slice(0,8))})`,'text-emerald-600');
+  }catch(e){
+   if(e.status===400||e.status===401||e.status===403){this.data.prefs.aiProvider=prev;this.save();return say(esc(e.message),'text-rose-600');}
+   say(`<i class="fa-solid fa-circle-check"></i> Key hợp lệ & đã lưu. ${e.timeout||e.kind==='busy'?'Gemini đang bận nên trả lời chậm — app sẽ tự thử lại/đổi mô hình khi bạn dùng.':esc(e.message)}`,'text-amber-600');
+  }finally{this._gemSaving=false;this._gemProgress=null;this._gemTO=null;const b2=document.querySelector('#set-ai button[onclick="app.saveGemini()"]');if(b2)b2.disabled=false;}
+ },
  async aiPlanAdvice(){if(!this.data.prefs.plan||!$('plan-ai')){this.toast('Hãy tạo và lưu kế hoạch trước, rồi nhờ AI gợi ý','error');if(this.view!=='plan')this.go('plan');return;}return BASE_ADVICE6.call(this);},
  async listGeminiModels(){
   const r=await this.gemFetch('models?pageSize=200');const js=await r.json().catch(()=>({}));
@@ -3036,9 +3071,10 @@ Object.assign(app,{
  gemMarkBad(m,ms){const b=this.gemBad();b[m]=Date.now()+ms;Object.keys(b).forEach(k=>{if(b[k]<Date.now())delete b[k];});try{localStorage.setItem('linhlam_gem_bad',JSON.stringify(b));}catch(e){}},
  async geminiCall(opts){
   const tried=new Set();let waitedRpm=false;const busy=new Set();let last=null;
-  for(let i=0;i<8;i++){
+  const maxT=(opts&&opts.maxTries)||8;
+  for(let i=0;i<maxT;i++){
    const model=this.gemPick(tried);if(!model)break;
-   this.data.prefs.geminiModel=model;
+   this.data.prefs.geminiModel=model;if(this._gemProgress)this._gemProgress(model,i);
    try{const r=await BASE_GEMCALL6.call(this,opts);this.save();return r;}
    catch(e){
     last=e;const raw=String(e.raw||'');const all=raw+' '+JSON.stringify(e.details||[]);
@@ -3049,6 +3085,8 @@ Object.assign(app,{
      if(!zero&&!perDay&&!waitedRpm&&secs>0&&secs<=20){waitedRpm=true;await sleepMs(secs*1000+300);continue;}
      this.gemMarkBad(model,zero?86400000:perDay?6*3600000:60000);tried.add(model);last.kind=zero?'zero':perDay?'day':'rpm';continue;
     }
+    if(e.status===400&&/modalit|not supported by the model|does not support|is not supported/i.test(raw)){this.gemMarkBad(model,30*86400000);tried.add(model);continue;}
+    if(e.timeout){this.gemMarkBad(model,2*60000);tried.add(model);last.kind='busy';continue;}
     if([500,502,503,504].includes(e.status)||/overloaded|high demand|UNAVAILABLE|try again later/i.test(raw)){
      last.kind='busy';if(!busy.size){busy.add(model);await sleepMs(1200);continue;}
      this.gemMarkBad(model,3*60000);tried.add(model);continue;
