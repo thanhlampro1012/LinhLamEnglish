@@ -2062,9 +2062,8 @@ Object.assign(app,{
   const js=await r.json().catch(()=>({}));
   if(!r.ok){const msg=(js.error&&js.error.message)||r.statusText||'';
    if(r.status===400&&tools&&/tool|url.?context|google.?search|not supported|unsupported/i.test(msg))return this.geminiCall({system,contents,tools:tools.length>1?[tools[0]]:null,json,temperature});
-   if(r.status===404&&model!=='gemini-flash-latest'){this.data.prefs.geminiModel='gemini-flash-latest';this.save();return this.geminiCall({system,contents,tools,json,temperature});}
    if(r.status===400&&json&&/mime|json/i.test(msg))return this.geminiCall({system,contents,tools,json:false,temperature});
-   throw new Error(/API_KEY_INVALID|API key not valid/i.test(msg)?'Gemini API key không hợp lệ — kiểm tra lại trong Cài đặt.':r.status===429?'Đã hết lượt miễn phí tạm thời hoặc gửi quá nhanh — đợi khoảng 1 phút rồi thử lại.':r.status===404?`Không tìm thấy mô hình “${model}” — vào Cài đặt bấm “Kiểm tra key” để chọn mô hình khác.`:r.status===403?'Key không có quyền dùng Gemini API (hoặc khu vực bị chặn).':`Lỗi Gemini (${r.status}): ${msg}`);}
+   throw Object.assign(new Error(/API_KEY_INVALID|API key not valid/i.test(msg)?'Gemini API key không hợp lệ — kiểm tra lại trong Cài đặt.':r.status===429?'Đã hết lượt miễn phí tạm thời hoặc gửi quá nhanh — đợi khoảng 1 phút rồi thử lại.':r.status===404?`Không tìm thấy mô hình “${model}” — vào Cài đặt bấm “Kiểm tra key” để chọn mô hình khác.`:r.status===403?'Key không có quyền dùng Gemini API (hoặc khu vực bị chặn).':`Lỗi Gemini (${r.status}): ${msg}`),{status:r.status,raw:msg,details:(js.error&&js.error.details)||[],model});}
   const cand=(js.candidates||[])[0];if(!cand)throw new Error(js.promptFeedback&&js.promptFeedback.blockReason?'Gemini từ chối nội dung này.':'Gemini không trả lời — thử lại.');
   const text=((cand.content&&cand.content.parts)||[]).filter(p=>p.text&&!p.thought).map(p=>p.text).join('');
   const src=[];const gm=cand.groundingMetadata||cand.grounding_metadata;((gm&&(gm.groundingChunks||gm.grounding_chunks))||[]).forEach(ch=>{const w=ch.web;if(w&&w.uri)src.push({url:w.uri,title:w.title||w.uri});});
@@ -2193,10 +2192,10 @@ Object.assign(app,{
   let ms=null,listErr=null;try{ms=await this.listGeminiModels();}catch(e){listErr=e;}
   if(listErr&&!listErr.net&&/không hợp lệ/.test(listErr.message)){msg.innerHTML=`<span class="text-rose-600">${esc(listErr.message)} Kiểm tra lại: key phải sao chép từ aistudio.google.com/apikey (bắt đầu bằng “AIza”).</span>`;return;}
   if(ms&&ms.length){this.data.prefs.geminiModels=ms;const sel=$('set-gmodel').value;this.data.prefs.geminiModel=ms.includes(sel)?sel:ms[0];}
-  if(this.data.prefs.aiProvider!=='bridge'&&(!this.data.prefs.aiProvider||!this.aiKey()))this.data.prefs.aiProvider='gemini';this.save();
+  const prevProv=this.data.prefs.aiProvider;this.data.prefs.aiProvider='gemini';this.save();
   try{const r=await this.geminiCall({contents:[{role:'user',parts:[{text:'Trả lời đúng một chữ: OK'}]}]});
    this.openSettings('ai');const m2=$('gem-msg');if(m2)m2.innerHTML=`<span class="text-emerald-600"><i class="fa-solid fa-circle-check"></i> Key hoạt động · mô hình ${esc(this.data.prefs.geminiModel||GEM_DEFAULT)} (${esc((r.text||'').trim().slice(0,10))})</span>`;}
-  catch(e){const test=`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(k)}`;
+  catch(e){if(e.status!==429){this.data.prefs.aiProvider=prevProv;this.save();}const test=`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(k)}`;
    msg.innerHTML=`<div class="text-rose-600 space-y-1.5"><p>${esc(e.message)}</p>${e.net?`<p class="text-slate-500">Kiểm tra nhanh: <a class="underline text-brand-600" target="_blank" rel="noopener" href="${esc(test)}">mở link này</a> trong tab mới. Nếu thấy chữ <code>"models"</code> thì key và mạng đều ổn → nguyên nhân là tiện ích/trình chặn trong trình duyệt. Nếu không mở được → mạng đang chặn Google API.</p>`:''}</div>`;}
  },
  /* ================= Giọng đọc hay hơn ================= */
@@ -3003,14 +3002,46 @@ function autoBtnIcons(root){
  *     tạo đề Reading, gợi ý kế hoạch).
  * ===================================================================== */
 const GEMINI_WEB='https://gemini.google.com/app';
-const BASE_PROVIDER6=app.aiProvider,BASE_LOOKUP6=app.aiLookup,BASE_AIASK6=app.aiAsk,BASE_AIJSON6=app.aiJSON,BASE_SETTINGS6=app.openSettings;
+const BASE_GEMCALL6=app.geminiCall,BASE_PROVIDER6=app.aiProvider,BASE_LOOKUP6=app.aiLookup,BASE_AIASK6=app.aiAsk,BASE_AIJSON6=app.aiJSON,BASE_SETTINGS6=app.openSettings;
 function copyTextSync(t){
  try{if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t);return true;}}catch(e){}
  try{const ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;top:-1000px;opacity:0';document.body.appendChild(ta);ta.select();const ok=document.execCommand('copy');ta.remove();return ok;}catch(e){return false;}
 }
 const jsonRepair=t=>String(t||'').replace(/^\s*```(?:json)?/i,'').replace(/```\s*$/,'').replace(/[“”]/g,'"').replace(/,\s*([}\]])/g,'$1').trim();
 
+const GEM_OK=n=>/^gemini-(\d+(?:\.\d+)?)-(flash|flash-lite|pro)(-latest|-preview(?:-[\w-]+)?|-\d{3})?$/.test(n)||/^gemini-(flash|flash-lite|pro)-latest$/.test(n);
+const gemRank=n=>{const v=(n.match(/gemini-(\d+(?:\.\d+)?)/)||[0,0])[1]*1;const pre=/preview|exp/.test(n);let r=/flash-lite/.test(n)?600:/flash/.test(n)?1000:/pro/.test(n)?100:0;if(/^gemini-flash-latest$/.test(n))r=1000+v;if(/^gemini-flash-lite-latest$/.test(n))r=600;return r+v*10-(pre?300:0)-(/-latest$/.test(n)&&v?5:0);};
+const sleepMs=ms=>new Promise(r=>setTimeout(r,ms));
 Object.assign(app,{
+ async listGeminiModels(){
+  const r=await this.gemFetch('models?pageSize=200');const js=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(/API key not valid|API_KEY_INVALID/i.test(JSON.stringify(js))?'Gemini API key không hợp lệ.':'Không đọc được danh sách mô hình ('+r.status+').');
+  const ms=(js.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes('generateContent')).map(m=>m.name.replace(/^models\//,'')).filter(GEM_OK);
+  return[...new Set(ms)].sort((a,b)=>gemRank(b)-gemRank(a));
+ },
+ gemFallbacks(cur,tried){const list=[...(this.data.prefs.geminiModels||[]),'gemini-flash-latest','gemini-flash-lite-latest'].filter(n=>!/pro/.test(n));return[...new Set(list)].filter(n=>n!==cur&&!tried.has(n)).sort((a,b)=>gemRank(b)-gemRank(a));},
+ async geminiCall(opts){
+  const tried=new Set();let waited=false;
+  {const m=this.data.prefs.geminiModel;if(m&&!GEM_OK(m)){this.data.prefs.geminiModel=(this.data.prefs.geminiModels||[]).find(GEM_OK)||GEM_DEFAULT;this.save();}}
+  for(let i=0;i<5;i++){
+   const model=this.data.prefs.geminiModel||GEM_DEFAULT;tried.add(model);
+   try{return await BASE_GEMCALL6.call(this,opts);}
+   catch(e){
+    if(e.status===429){
+     const raw=String(e.raw||'');const all=raw+' '+JSON.stringify(e.details||[]);const zero=/limit:\s*0\b|free_tier[^]*limit:\s*0|does not have (any )?free|not available.*free|billing/i.test(all);
+     const perDay=/per\s*day|PerDay/i.test(all)&&!zero;
+     const retry=(e.details||[]).map(d=>d&&d.retryDelay).find(Boolean);const secs=retry?parseFloat(retry):NaN;
+     if(!zero&&!perDay&&!waited&&secs>0&&secs<=25){waited=true;await sleepMs(secs*1000+300);continue;}
+     const next=this.gemFallbacks(model,tried)[0];
+     if(next&&(zero||perDay||waited||!(secs>0))){this.data.prefs.geminiModel=next;this.save();continue;}
+     throw Object.assign(new Error(zero?`Mô hình “${model}” không có lượt miễn phí cho key này. Vào Cài đặt chọn mô hình có chữ “flash”.`:perDay?'Đã dùng hết lượt miễn phí trong ngày của key này — thử lại vào ngày mai hoặc dùng chế độ “Gemini của tôi”.':`Gemini đang giới hạn tốc độ — đợi khoảng 1 phút rồi thử lại. (${raw.slice(0,140)})`),{status:429,raw});
+    }
+    if(e.status===404){const next=this.gemFallbacks(model,tried)[0];if(next){this.data.prefs.geminiModel=next;this.save();continue;}}
+    throw e;
+   }
+  }
+  throw new Error('Không gọi được Gemini sau nhiều lần thử — hãy thử lại sau ít phút.');
+ },
  aiProvider(){
   const p=this.data.prefs.aiProvider;
   if(p==='bridge')return'bridge';
