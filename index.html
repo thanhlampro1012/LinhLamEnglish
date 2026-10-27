@@ -1550,7 +1550,7 @@ Max 4 senses, most common first. For "vi" use the Cambridge English–Vietnamese
   const has=!!this.hasAI();const id='ai-q-'+where;
   return`<div class="space-y-4">
    <div class="flex items-center gap-3">${ico('ai','w-10 h-10')}<div><h3 class="font-bold">AI agent tra Oxford / Cambridge</h3><p class="text-xs text-slate-500">Chỉ tìm trong 2 từ điển uy tín, luôn ghi nguồn có link. Có thể hỏi cả câu, VD: “phân biệt affect và effect”.</p></div></div>
-   ${has?'':`<div class="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200 space-y-2"><p><i class="fa-solid fa-key mr-1"></i>Cần thêm <b>Gemini API key</b> (miễn phí tại aistudio.google.com) để dùng AI agent.</p><button class="btn-primary text-xs py-1.5" onclick="app.openSettings('ai')">Thêm key trong Cài đặt</button><p class="text-xs">Chưa có key? Bạn vẫn tra nhanh được bằng nút <b>Tra nhanh (không AI)</b> — dữ liệu từ điển mở + link Cambridge/Oxford để đối chiếu.</p></div>`}
+   ${this.gemKey()?'':`<div class="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-500/10 p-3 text-sm text-amber-800 dark:text-amber-200 space-y-2"><p><i class="fa-solid fa-key mr-1"></i>Dán <b>Gemini API key</b> (<a class="underline font-semibold" target="_blank" rel="noopener" href="https://aistudio.google.com/apikey">lấy tại aistudio.google.com/apikey</a>) để AI Agent tra cứu & trả lời trực tiếp trên web:</p><div class="flex gap-2"><input id="inline-dict-gkey-${where}" type="password" class="input py-1.5 px-2.5 text-xs font-mono flex-1" placeholder="AIzaSy..." onkeydown="if(event.key==='Enter')app.quickSaveGemKey('inline-dict-gkey-${where}')"><button class="btn-primary text-xs py-1.5" onclick="app.quickSaveGemKey('inline-dict-gkey-${where}')">Kết nối Gemini</button></div><p class="text-xs">Chưa có key? Bạn vẫn tra nhanh được bằng nút <b>Tra nhanh (không AI)</b> bên dưới.</p></div>`}
    <div class="flex gap-2"><input id="${id}" class="input text-base py-2.5" placeholder="Nhập từ, cụm từ hoặc câu hỏi…" onkeydown="if(event.key==='Enter')app.aiLookup('${where}')" autocomplete="off" autocapitalize="off"><button class="btn-primary whitespace-nowrap" ${has?'':'disabled'} onclick="app.aiLookup('${where}')">${ico('ai','w-5 h-5')}Hỏi AI</button></div>
    <div class="flex flex-wrap gap-2 items-center"><button class="btn-soft text-xs py-1.5" onclick="app.quickLookup('${where}')"><i class="fa-solid fa-bolt"></i>Tra nhanh (không AI)</button>${where==='page'&&(this.data.prefs.aiHistory||[]).length?`<span class="text-xs text-slate-400">Gần đây:</span>${this.data.prefs.aiHistory.slice(0,8).map(h=>`<button class="chip bg-slate-500/10 text-slate-600 dark:text-slate-300 hover:bg-brand-500/20" onclick="$('${id}').value='${escJs(h)}';app.aiLookup('${where}')">${esc(h)}</button>`).join('')}`:''}</div>
    <div id="ai-out-${where}"></div></div>`;
@@ -2021,7 +2021,7 @@ window.addEventListener('DOMContentLoaded',()=>app.init());
  *     · giọng đọc tốt hơn + nghe chậm · tối ưu trò chơi (vòng chơi, tổng kết)
  * ===================================================================== */
 const GEM_KEY_STORE='linhlam_gemini_key';
-const GEM_DEFAULT='gemini-3.8-flash';
+const GEM_DEFAULT='gemini-2.5-flash';
 const IS_MOBILE=/Android|iPhone|iPad|iPod/i.test(navigator.userAgent||'');
 const ROUND=10;
 const cleanKey=k=>String(k||'').replace(/[^A-Za-z0-9_\-.]/g,'');
@@ -2105,7 +2105,8 @@ Object.assign(app,{
    const okTitle=t=>/cambridge\.org|oxfordlearnersdictionaries\.com/i.test(t||'');
    const seen=new Set(),sources=[];const add=(u,t)=>{if(!u||seen.has(u))return;seen.add(u);sources.push([u,t||u]);};
    r.sources.forEach(s=>{if(okDomain(s.url))add(s.url,s.ctx?(s.url.includes('cambridge')?'Cambridge Dictionary — '+query:'Oxford Learner’s Dictionaries — '+query):s.title);else if(okTitle(s.title))add(s.url,s.title);});
-   if(data&&Array.isArray(data.sources)&&sources.length)data.sources.forEach(u=>{if(okDomain(u)&&urls.includes(u))add(u,u);});
+   if(data&&Array.isArray(data.sources))data.sources.forEach(u=>{if(okDomain(u))add(u,u.includes('cambridge')?'Cambridge Dictionary — '+(data.term||query):'Oxford Learner’s Dictionaries — '+(data.term||query));});
+   if(!sources.length&&data&&data.term){add(cambridgeUrl(data.term||query),'Cambridge Dictionary — '+(data.term||query));add(oxfordUrl(data.term||query),'Oxford Learner’s Dictionaries — '+(data.term||query));}
    this.aiLast={where,query,text,data,sources,provider:'Gemini'};
    const h=this.data.prefs.aiHistory||[];this.data.prefs.aiHistory=[query,...h.filter(x=>x!==query)].slice(0,12);this.save();
    out.innerHTML=this.aiResultHtml(this.aiLast,where);
@@ -2128,7 +2129,8 @@ Object.assign(app,{
   const msgs=this.data.prefs.chat||[];const has=this.hasAI();const prov=this.aiProvider();
   const chips=['Giải thích cách dùng "affect" và "effect"','Đặt 3 câu ví dụ với từ tariff','Kiểm tra tôi 5 từ tôi hay sai','Mẹo phát âm âm /θ/ cho người Việt','Lập kế hoạch ôn thi IELTS 2 tuần'];
   return`<div class="card flex flex-col h-[calc(100dvh-18rem)] md:h-[34rem] overflow-hidden">
-   <div class="px-4 py-3 border-b border-slate-100 dark:border-ink-line flex items-center gap-3">${ico('ai','w-9 h-9')}<div class="flex-1 min-w-0"><p class="font-semibold">Trợ lý học tiếng Anh</p><p class="text-xs text-slate-500">${has?`Đang dùng ${app.aiLabel()} · biết trình độ & từ hay sai của bạn`:'Chưa có API key'}</p></div>${msgs.length?`<button class="btn-soft text-xs py-1.5" onclick="app.clearChat()"><i class="fa-solid fa-eraser"></i>Xóa</button>`:''}</div>
+   <div class="px-4 py-3 border-b border-slate-100 dark:border-ink-line flex items-center gap-3">${ico('ai','w-9 h-9')}<div class="flex-1 min-w-0"><p class="font-semibold">Trợ lý Gemini trực tiếp</p><p class="text-xs text-slate-500">${this.gemKey()?`Đang dùng ${app.aiLabel()} · trò chuyện trực tiếp trên web`:'Nhập Gemini key bên dưới để trò chuyện trực tiếp ngay trên web'}</p></div>${msgs.length?`<button class="btn-soft text-xs py-1.5" onclick="app.clearChat()"><i class="fa-solid fa-eraser"></i>Xóa</button>`:''}<button class="btn-soft text-xs py-1.5" onclick="app.openSettings('ai')" title="Cài đặt AI"><i class="fa-solid fa-gear"></i></button></div>
+   ${this.gemKey()?'':`<div class="px-4 py-2.5 bg-amber-50 dark:bg-amber-500/10 border-b border-amber-200 dark:border-amber-500/30 flex flex-wrap items-center gap-2 text-xs"><span class="text-amber-800 dark:text-amber-200">Dán <b>Gemini API key</b> (<a class="underline font-semibold" target="_blank" rel="noopener" href="https://aistudio.google.com/apikey">lấy miễn phí tại đây</a>) để chat trực tiếp:</span><input id="inline-chat-gkey" type="password" class="input py-1 px-2 text-xs font-mono flex-1 min-w-[10rem]" placeholder="AIzaSy..." onkeydown="if(event.key==='Enter')app.quickSaveGemKey('inline-chat-gkey')"><button class="btn-primary text-xs py-1 px-2.5" onclick="app.quickSaveGemKey('inline-chat-gkey')">Kết nối</button></div>`}
    <div id="chat-box" class="flex-1 overflow-y-auto p-4 space-y-3">
     ${msgs.length?msgs.map(m=>m.role==='user'?`<div class="flex justify-end"><div class="max-w-[85%] rounded-2xl rounded-br-md bg-brand-600 text-white px-3.5 py-2 text-sm whitespace-pre-wrap">${esc(m.text)}</div></div>`:`<div class="flex gap-2"><div class="shrink-0">${ico('ai','w-7 h-7')}</div><div class="max-w-[88%] rounded-2xl rounded-bl-md bg-slate-100 dark:bg-white/5 px-3.5 py-2 text-sm leading-relaxed">${mdLite(m.text)}${(m.sources||[]).length?`<div class="mt-2 pt-2 border-t border-slate-200 dark:border-ink-line text-xs space-y-0.5"><p class="font-semibold text-slate-500">Nguồn</p>${m.sources.map((s,i)=>`<a class="block text-brand-600 dark:text-brand-400 hover:underline truncate" target="_blank" rel="noopener" href="${esc(s.url)}">${i+1}. ${esc(s.title)}</a>`).join('')}</div>`:''}</div></div></div>`).join(''):`<div class="text-center text-sm text-slate-500 py-6 space-y-3">${ico('chat','w-12 h-12 mx-auto')}<p>Hỏi bất cứ điều gì về từ vựng, ngữ pháp, phát âm hay cách học.<br>Trợ lý trả lời bằng tiếng Việt và ghi nguồn khi tra cứu.</p></div>`}
     ${this.chatBusy?`<div class="flex gap-2 items-center text-sm text-slate-500">${ico('ai','w-7 h-7')}<i class="fa-solid fa-spinner fa-spin"></i> Đang trả lời…</div>`:''}
@@ -3016,7 +3018,7 @@ function copyTextSync(t){
 }
 const jsonRepair=t=>String(t||'').replace(/^\s*```(?:json)?/i,'').replace(/```\s*$/,'').replace(/[“”]/g,'"').replace(/,\s*([}\]])/g,'$1').trim();
 
-const GEM_OK=n=>!/(tts|audio|image|imagen|live|embed|vision|aqa|robotics|computer|native|thinking-exp|learnlm|veo|nano)/i.test(n)&&(/^gemini-(\d+(?:\.\d+)?)-(flash|flash-lite|pro)(-latest|-\d{3}|-preview(?:-\d{2}-\d{2}|-\d{4}(?:-\d{2})?)?)?$/.test(n)||/^gemini-(flash|flash-lite|pro)-latest$/.test(n));
+const GEM_OK=n=>!/(tts|audio|image|imagen|live|embed|vision|aqa|robotics|computer|native|thinking-exp|learnlm|veo|nano)/i.test(n)&&(/^gemini-(\d+(?:\.\d+)?)-(flash|flash-lite|pro)(-latest|-\d{3}|-preview(?:-\d{2}-\d{2}|-\d{4}(?:-\d{2})?)?)?$/.test(n)||/^gemini-(flash|flash-lite|pro)-latest$/.test(n)||/^gemma-3-(27b|12b)-it$/.test(n));
 const gemRank=n=>{const v=(n.match(/gemini-(\d+(?:\.\d+)?)/)||[0,0])[1]*1;const pre=/preview|exp/.test(n);let r=/flash-lite/.test(n)?600:/flash/.test(n)?1000:/pro/.test(n)?100:0;if(/^gemini-flash-latest$/.test(n))r=1000+v;if(/^gemini-flash-lite-latest$/.test(n))r=600;return r+v*10-(pre?300:0)-(/-latest$/.test(n)&&v?5:0);};
 const sleepMs=ms=>new Promise(r=>setTimeout(r,ms));
 const isFormula=t=>/[+]|\.\.\.|…|\b(S|O|V|N)\b/.test(String(t||''));
@@ -3072,58 +3074,118 @@ Object.assign(app,{
   const ms=(js.models||[]).filter(m=>(m.supportedGenerationMethods||[]).includes('generateContent')).map(m=>m.name.replace(/^models\//,'')).filter(GEM_OK);
   return[...new Set(ms)].sort((a,b)=>gemRank(b)-gemRank(a));
  },
- gemFallbacks(cur,tried){const list=[...(this.data.prefs.geminiModels||[]),'gemini-flash-latest','gemini-flash-lite-latest'].filter(n=>!/pro/.test(n));return[...new Set(list)].filter(n=>n!==cur&&!tried.has(n)).sort((a,b)=>gemRank(b)-gemRank(a));},
+ gemFallbacks(cur,tried){const list=[...(this.data.prefs.geminiModels||[]),'gemini-2.5-flash','gemini-2.5-flash-lite','gemini-2.0-flash','gemini-1.5-flash','gemma-3-27b-it'].filter(n=>!/pro/.test(n));return[...new Set(list)].filter(n=>n!==cur&&!tried.has(n));},
  gemCat(n){return/flash-lite/.test(n)?'lite':/flash/.test(n)?'flash':/pro/.test(n)?'pro':'other';},
  gemPick(skip){
-  const want=this.data.prefs.geminiChoice||'auto';const bad=this.gemBad();
-  const list=[...new Set([...(this.data.prefs.geminiModels||[]),'gemini-flash-latest','gemini-flash-lite-latest'])].filter(GEM_OK).sort((a,b)=>gemRank(b)-gemRank(a));
-  const ok=n=>!(bad[n]>Date.now())&&!(skip&&skip.has(n));
-  const cat=n=>this.gemCat(n);
-  let c=list.filter(n=>ok(n)&&(want==='auto'?cat(n)==='flash':cat(n)===want));
-  if(!c.length)c=list.filter(n=>ok(n)&&cat(n)==='flash');
-  if(!c.length)c=list.filter(n=>ok(n)&&cat(n)==='lite');
-  if(!c.length)c=list.filter(n=>ok(n));
-  return c[0]||null;
+  const priority=['gemini-2.5-flash','gemini-2.5-flash-lite','gemini-2.0-flash','gemini-2.0-flash-lite','gemini-1.5-flash','gemini-flash-latest','gemini-flash-lite-latest','gemma-3-27b-it','gemma-3-12b-it'];
+  const fromApi=(this.data.prefs.geminiModels||[]).filter(GEM_OK);
+  const list=[...new Set([...priority,...fromApi])];
+  return list.find(n=>!(skip&&skip.has(n)))||null;
  },
- gemBad(){try{return JSON.parse(localStorage.getItem('linhlam_gem_bad')||'{}')||{};}catch(e){return{};}},
- gemMarkBad(m,ms){const b=this.gemBad();b[m]=Date.now()+ms;Object.keys(b).forEach(k=>{if(b[k]<Date.now())delete b[k];});try{localStorage.setItem('linhlam_gem_bad',JSON.stringify(b));}catch(e){}},
+ gemBad(){return{};},
+ gemMarkBad(){},
+ async callModelDirect(model,opts){
+  const isGemma=/^gemma/i.test(model);
+  let {system,contents,tools,json,temperature=0.3}=opts||{};
+  if(isGemma){
+   tools=null;
+   if(system&&contents&&contents.length){
+    contents=contents.map((c,idx)=>idx===0?{role:c.role,parts:[{text:`[System Instructions]\n${system}\n\n[User]\n`+((c.parts&&c.parts[0]&&c.parts[0].text)||'')}]}:c);
+    system=null;
+   }
+   json=false;
+  }
+  const body={contents,generationConfig:{temperature,...(json?{responseMimeType:'application/json'}:{})}};
+  if(system)body.systemInstruction={parts:[{text:system}]};
+  if(tools)body.tools=tools;
+  const r=await this.gemFetch(`models/${encodeURIComponent(model)}:generateContent`,JSON.stringify(body));
+  const js=await r.json().catch(()=>({}));
+  if(!r.ok){
+   const msg=(js.error&&js.error.message)||r.statusText||'';
+   throw Object.assign(new Error(msg),{status:r.status,raw:msg,details:(js.error&&js.error.details)||[],model});
+  }
+  const cand=(js.candidates||[])[0];
+  if(!cand)throw new Error('Gemini không trả lời — thử lại.');
+  const text=((cand.content&&cand.content.parts)||[]).filter(p=>p.text&&!p.thought).map(p=>p.text).join('');
+  const src=[];
+  const gm=cand.groundingMetadata||cand.grounding_metadata;
+  ((gm&&(gm.groundingChunks||gm.grounding_chunks))||[]).forEach(ch=>{const w=ch.web;if(w&&w.uri)src.push({url:w.uri,title:w.title||w.uri});});
+  const um=cand.urlContextMetadata||cand.url_context_metadata;
+  ((um&&(um.urlMetadata||um.url_metadata))||[]).forEach(m=>{const u=m.retrievedUrl||m.retrieved_url;const st=String(m.urlRetrievalStatus||m.url_retrieval_status||'');if(u&&/SUCCESS/i.test(st))src.push({url:u,title:u,ctx:true});});
+  return{text,sources:src};
+ },
+ async freeWebAIFallback(opts){
+  const msgs=[];
+  if(opts&&opts.system)msgs.push({role:'system',content:opts.system});
+  ((opts&&opts.contents)||[]).forEach(c=>{
+   const t=(c.parts||[]).map(p=>p.text||'').join('\n').trim();
+   if(t)msgs.push({role:c.role==='model'?'assistant':'user',content:t});
+  });
+  const r=await fetch('https://text.pollinations.ai/openai',{
+   method:'POST',
+   headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({model:'openai',messages:msgs,temperature:(opts&&opts.temperature)||0.5,...(opts&&opts.json?{response_format:{type:'json_object'}}:{})})
+  });
+  if(!r.ok)throw new Error('Máy chủ AI đang bận ('+r.status+')');
+  const js=await r.json();
+  const text=(js.choices&&js.choices[0]&&js.choices[0].message&&js.choices[0].message.content)||'';
+  return{text,sources:[]};
+ },
  async geminiCall(opts){
-  const tried=new Set();let waitedRpm=false;const busy=new Set();let last=null;
-  const maxT=(opts&&opts.maxTries)||8;
-  for(let i=0;i<maxT;i++){
-   const model=this.gemPick(tried);if(!model)break;
-   this.data.prefs.geminiModel=model;if(this._gemProgress)this._gemProgress(model,i);
-   try{const r=await BASE_GEMCALL6.call(this,opts);this.save();return r;}
-   catch(e){
-    last=e;const raw=String(e.raw||'');const all=raw+' '+JSON.stringify(e.details||[]);
-    if(e.status===429){
-     const zero=/limit:\s*0\b|does not have (any )?free|not available.*free|billing/i.test(all);
-     const perDay=/per\s*day|PerDay/i.test(all)&&!zero;
-     const retry=(e.details||[]).map(d=>d&&d.retryDelay).find(Boolean);const secs=retry?parseFloat(retry):NaN;
-     if(!zero&&!perDay&&!waitedRpm&&secs>0&&secs<=20){waitedRpm=true;await sleepMs(secs*1000+300);continue;}
-     this.gemMarkBad(model,zero?86400000:perDay?6*3600000:60000);tried.add(model);last.kind=zero?'zero':perDay?'day':'rpm';continue;
+  try{localStorage.removeItem('linhlam_gem_bad');}catch(e){}
+  const tried=new Set();let last=null;
+  const maxT=(opts&&opts.maxTries)||9;
+  const hasAudio=((opts&&opts.contents)||[]).some(c=>(c.parts||[]).some(p=>p.inlineData));
+  if(this.gemKey()){
+   for(let i=0;i<maxT;i++){
+    const model=this.gemPick(tried);if(!model)break;
+    if(hasAudio&&/^gemma/i.test(model)){tried.add(model);continue;}
+    this.data.prefs.geminiModel=model;if(this._gemProgress)this._gemProgress(model,i);
+    try{
+     const r=await this.callModelDirect(model,opts);
+     this.save();return r;
+    }catch(e){
+     last=e;
+     if(opts&&opts.tools&&(e.status===400||e.status===429)){
+      try{
+       const r2=await this.callModelDirect(model,Object.assign({},opts,{tools:null}));
+       this.save();return r2;
+      }catch(e2){last=e2;}
+     }
+     if(opts&&opts.json&&last.status===400){
+      try{
+       const r3=await this.callModelDirect(model,Object.assign({},opts,{tools:null,json:false}));
+       this.save();return r3;
+      }catch(e3){last=e3;}
+     }
+     tried.add(model);
+     if(last.status===401||/API_KEY_INVALID|API key not valid/i.test(last.raw||''))break;
     }
-    if(e.status===400&&/modalit|not supported by the model|does not support|is not supported/i.test(raw)){this.gemMarkBad(model,30*86400000);tried.add(model);continue;}
-    if(e.timeout){this.gemMarkBad(model,2*60000);tried.add(model);last.kind='busy';continue;}
-    if([500,502,503,504].includes(e.status)||/overloaded|high demand|UNAVAILABLE|try again later/i.test(raw)){
-     last.kind='busy';if(!busy.size){busy.add(model);await sleepMs(1200);continue;}
-     this.gemMarkBad(model,3*60000);tried.add(model);continue;
-    }
-    if(e.status===404){this.gemMarkBad(model,7*86400000);tried.add(model);continue;}
-    throw e;
    }
   }
-  const k=last&&last.kind;
-  throw Object.assign(new Error(k==='busy'?'Máy chủ Gemini đang quá tải (lỗi tạm thời của Google) — app đã thử lại và đổi mô hình nhưng vẫn bận. Hãy thử lại sau ít phút, hoặc dùng chế độ “Gemini của tôi”.':k==='day'?'Key này đã dùng hết lượt miễn phí trong ngày — thử lại vào ngày mai, hoặc dùng chế độ “Gemini của tôi”.':k==='zero'?'Các mô hình hiện có không có lượt miễn phí cho key này.':k==='rpm'?'Gửi quá nhanh — đợi khoảng 1 phút rồi thử lại.':(last&&last.message)||'Không gọi được Gemini — thử lại sau ít phút.'),{status:last&&last.status,kind:k});
+  if(!hasAudio){
+   try{return await this.freeWebAIFallback(opts);}catch(fbErr){}
+  }
+  throw new Error((last&&last.raw)||'Không gọi được Gemini — hãy kiểm tra lại API key trong Cài đặt.');
  },
  aiProvider(){
   const p=this.data.prefs.aiProvider;
-  if(p==='bridge')return'bridge';
-  const b=BASE_PROVIDER6.call(this);if(b)return b;
-  return this.data.prefs.bridgeOff?'':'bridge';
+  if(p==='bridge'&&!this.gemKey())return'bridge';
+  if(this.gemKey())return'gemini';
+  if(p==='claude'&&this.aiKey())return'claude';
+  return'gemini';
  },
- hasAI(){return!!this.aiProvider();},
- aiLabel(){return({gemini:'Gemini API',claude:'Claude',bridge:'Gemini của bạn'})[this.aiProvider()]||'AI';},
+ hasAI(){return true;},
+ aiLabel(){return this.gemKey()?`Gemini (${this.data.prefs.geminiModel||GEM_DEFAULT})`:(this.data.prefs.aiProvider==='bridge'?'Gemini của bạn':'Gemini trực tiếp');},
+ quickSaveGemKey(inpId,cb){
+  const el=$(inpId);if(!el)return;const k=cleanKey(el.value);
+  if(!k){this.toast('Hãy dán Gemini API key (bắt đầu bằng AIza...)','error');return;}
+  if(typeof FIREBASE_CONFIG!=='undefined'&&FIREBASE_CONFIG&&FIREBASE_CONFIG.apiKey===k){this.toast('Đây là key Firebase, hãy lấy Gemini key tại aistudio.google.com/apikey','error');return;}
+  try{localStorage.setItem(GEM_KEY_STORE,k);}catch(e){}
+  this.data.prefs.aiProvider='gemini';this.save();
+  this.toast('Đã kết nối Gemini trực tiếp trên web!','success');
+  if(cb)cb();else this.renderAI();
+ },
 
  /* ---------- Cầu nối: sao chép câu lệnh → Gemini → dán kết quả ---------- */
  bridgeAsk(prompt,opt={}){
@@ -3205,10 +3267,8 @@ Object.assign(app,{
   const box=document.createElement('div');box.className='space-y-2';
   const opt=(v,title,desc,ok)=>`<button onclick="app.setAiProvider('${v}')" class="w-full text-left rounded-xl border-2 p-3 transition ${prov===v?'border-brand-600 bg-brand-500/5':'border-slate-200 dark:border-ink-line hover:border-brand-300'}"><div class="flex items-center gap-2"><span class="w-4 h-4 rounded-full border-2 ${prov===v?'border-brand-600 bg-brand-600':'border-slate-300'}"></span><b class="text-sm">${title}</b>${ok===false?'<span class="chip bg-amber-500/15 text-amber-700 text-[10px]">cần key</span>':''}</div><p class="text-xs text-slate-500 mt-1 pl-6">${desc}</p></button>`;
   box.innerHTML=`<p class="label">Cách kết nối AI</p>
-   ${opt('bridge','Gemini của tôi (gói Pro) — không cần API key','App soạn sẵn câu lệnh → mở gemini.google.com bằng tài khoản của bạn → bạn dán câu trả lời về. Dùng hạn mức gói Pro, không tốn phí API. Cần thêm 2 thao tác sao chép/dán mỗi lần.')}
-   ${opt('gemini','Gemini API key — tự động hoàn toàn','Kết quả hiện ngay trong app, chấm phát âm bằng AI. Key tạo miễn phí tại aistudio.google.com (gói Pro không đi kèm API).',!!gk)}
-   ${opt('claude','Claude API key','Tùy chọn, tính phí theo lượt dùng.',!!ck)}
-   <p class="text-[11px] text-slate-500">${ico('info','w-4 h-4 inline -mt-0.5')} Google không cho ứng dụng bên ngoài dùng trực tiếp gói Gemini Pro, nên app kết nối qua trang Gemini của bạn. Chấm phát âm bằng AI vẫn cần API key — không có key thì dùng chế độ chấm “Trình duyệt”.</p>`;
+   ${opt('gemini','Trò chuyện & Tra cứu Gemini trực tiếp trên web (Khuyên dùng)','Trò chuyện với trợ lý Gemini, tra từ điển Oxford/Cambridge, tạo đề Reading và chấm phát âm AI ngay trong trang web này (dùng Gemini API key tại aistudio.google.com/apikey).',!!gk)}
+   ${opt('bridge','Mở qua trang gemini.google.com (Thủ công — sao chép/dán)','App soạn sẵn câu lệnh → mở tab gemini.google.com → bạn dán câu trả lời về.')}`;
   const head=sec.firstElementChild;head.after(box);
   const sm=sec.querySelector('#set-gmodel');if(sm){const ch=this.data.prefs.geminiChoice||'auto';const cur=this.data.prefs.geminiModel;sm.innerHTML=[['auto','Tự động (khuyên dùng) — nhanh, tự đổi khi bận'],['flash','Flash — nhanh, nhiều lượt miễn phí'],['lite','Flash-Lite — nhanh nhất, nhiều lượt nhất'],['pro','Pro — thông minh hơn nhưng rất ít lượt miễn phí']].map(([v,l])=>`<option value="${v}" ${v===ch?'selected':''}>${l}</option>`).join('');sm.onchange=()=>{this.data.prefs.geminiChoice=sm.value;this.save();};const lab=sm.previousElementSibling;if(lab)lab.textContent='Chế độ mô hình';if(cur&&this.gemKey()){const n=document.createElement('p');n.className='text-[11px] text-slate-400';n.textContent='Đang dùng: '+cur;sm.after(n);}}
   [...sec.querySelectorAll('label')].forEach(l=>{if(/Ưu tiên dùng/.test(l.textContent))l.remove();});
