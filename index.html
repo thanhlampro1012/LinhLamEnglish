@@ -1689,7 +1689,7 @@ Max 4 senses, most common first. For "vi" use the Cambridge English–Vietnamese
   const summary={plan:p,computed:{newPerDay:c.perDay,remainingNew:c.totalNew,weeksNeeded:c.weeks,neededPerDayForDeadline:c.need,feasible:c.feasible},dueToday:all.filter(isDue).length,streakDays:this.streak(),last14,byLevel,weakWords:weak,lowPronunciation:badPron};
   try{const SYSP='Bạn là huấn luyện viên học từ vựng tiếng Anh cho người Việt. Dựa CHỈ trên dữ liệu JSON được cung cấp (không bịa số liệu), đưa ra nhận xét và điều chỉnh kế hoạch cụ thể, thực tế. Trả lời bằng tiếng Việt, tối đa 200 từ, dạng gạch đầu dòng: 1) Nhận xét nhanh tiến độ; 2) Điều chỉnh số từ/ngày hoặc thời gian; 3) Từ/kỹ năng cần ưu tiên tuần này (nêu tên từ cụ thể nếu có); 4) Một mẹo ghi nhớ phù hợp mục tiêu.';
    const t=(await this.aiAsk(SYSP,JSON.stringify(summary),900)).trim();this.data.prefs.planAdvice=t;this.save();el.innerHTML=mdLite(t)+'<p class="text-[11px] text-slate-400 mt-2">Lời khuyên do AI tạo từ thống kê học của bạn.</p>';}
-  catch(e){el.innerHTML=`<span class="text-rose-600">${esc(e.message)}</span>`;}
+  catch(e){el.innerHTML=e&&e.cancel?(this.data.prefs.planAdvice?mdLite(this.data.prefs.planAdvice):'Đã hủy — bấm lại khi bạn sẵn sàng.'):`<span class="text-rose-600">${esc(e.message)}</span>`;}
  }
 });
 
@@ -2275,7 +2275,6 @@ Object.assign(app,{
  toggleRecord(){
   const R=this.rec||{};if(R.active){if(R.phase==='analyse')return;this.finishRec();return;}
   const c=this.spk.list[this.spk.i];this.spk.result=null;const mode=this.pronMode();
-  if(location.protocol==='file:'&&mode==='sr'){this.spk.result={error:'Nhận dạng giọng nói không chạy khi mở file trực tiếp trên máy. Hãy mở app qua link https (GitHub Pages), hoặc chuyển sang chế độ Gemini AI.'};return this.renderSpeak();}
   if(mode==='sr')return this.startSR(c);if(mode==='ai')return this.startAIRec(c);
  },
  startSR(c){
@@ -2284,7 +2283,7 @@ Object.assign(app,{
   r.lang=this.accent==='us'?'en-US':'en-GB';r.maxAlternatives=5;r.interimResults=true;r.continuous=false;
   r.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++){const res=e.results[i];const alts=Array.from(res).map(a=>({t:a.transcript,c:a.confidence}));if(res.isFinal)R.alts=alts;else R.interim=alts;}if(R.alts){try{r.stop();}catch(x){}}};
   r.onspeechend=()=>{try{r.stop();}catch(x){}};
-  r.onerror=e=>{const insecure=!window.isSecureContext;R.err={'no-speech':'Không nghe thấy giọng nói. Hãy đọc to hơn, gần micro hơn (nói ngay sau khi bấm).','not-allowed':insecure?'Trang chưa an toàn (không phải https) nên trình duyệt chặn micro — hãy mở qua link GitHub Pages.':'Micro đang bị chặn: bấm biểu tượng ổ khóa cạnh thanh địa chỉ → Micro → Cho phép, rồi tải lại trang.','service-not-allowed':'Trình duyệt chặn dịch vụ nhận dạng giọng nói — hãy dùng Chrome hoặc chuyển sang chế độ Gemini AI.','network':'Trình duyệt không kết nối được dịch vụ nhận dạng giọng nói (thường gặp ở Brave, Cốc Cốc, Opera hoặc khi mạng chặn Google). Hãy dùng Chrome/Edge, hoặc chuyển sang chế độ Gemini AI.','audio-capture':'Không tìm thấy micro, hoặc micro đang bị ứng dụng khác dùng (Zoom, Meet…).','language-not-supported':'Thiết bị không hỗ trợ nhận dạng giọng này — thử chuyển sang Giọng US.','aborted':''}[e.error];if(R.err===undefined)R.err='Lỗi nhận dạng: '+e.error;};
+  r.onerror=e=>{const insecure=!window.isSecureContext;R.err={'no-speech':'Không nghe thấy giọng nói. Hãy đọc to hơn, gần micro hơn (nói ngay sau khi bấm).','not-allowed':location.protocol==='file:'?'Trình duyệt chặn micro khi mở file trực tiếp trên máy — hãy mở app qua link GitHub Pages (https).':insecure?'Trang chưa an toàn (không phải https) nên trình duyệt chặn micro — hãy mở qua link GitHub Pages.':'Micro đang bị chặn: bấm biểu tượng ổ khóa cạnh thanh địa chỉ → Micro → Cho phép, rồi tải lại trang.','service-not-allowed':'Trình duyệt chặn dịch vụ nhận dạng giọng nói — hãy dùng Chrome hoặc chuyển sang chế độ Gemini AI.','network':'Trình duyệt không kết nối được dịch vụ nhận dạng giọng nói (thường gặp ở Brave, Cốc Cốc, Opera hoặc khi mạng chặn Google). Hãy dùng Chrome/Edge, hoặc chuyển sang chế độ Gemini AI.','audio-capture':'Không tìm thấy micro, hoặc micro đang bị ứng dụng khác dùng (Zoom, Meet…).','language-not-supported':'Thiết bị không hỗ trợ nhận dạng giọng này — thử chuyển sang Giọng US.','aborted':''}[e.error];if(R.err===undefined)R.err='Lỗi nhận dạng: '+e.error;};
   r.onend=()=>{if(this.rec!==R||R.cancelled)return;clearTimeout(R.timer);R.active=false;const alts=R.alts||R.interim;
    if(alts&&alts.length&&alts.some(a=>a.t&&a.t.trim()))this.finishSpeak(c,alts.map(a=>({t:a.t,c:a.c||0.6})));
    else{this.spk.result=R.err===''?null:{error:R.err||'Chưa nghe rõ — hãy bấm micro và đọc ngay, to và rõ.'};this.renderSpeak();}};
@@ -3002,7 +3001,7 @@ function autoBtnIcons(root){
  *     tạo đề Reading, gợi ý kế hoạch).
  * ===================================================================== */
 const GEMINI_WEB='https://gemini.google.com/app';
-const BASE_GEMCALL6=app.geminiCall,BASE_PROVIDER6=app.aiProvider,BASE_LOOKUP6=app.aiLookup,BASE_AIASK6=app.aiAsk,BASE_AIJSON6=app.aiJSON,BASE_SETTINGS6=app.openSettings;
+const BASE_ADVICE6=app.aiPlanAdvice,BASE_GEMCALL6=app.geminiCall,BASE_PROVIDER6=app.aiProvider,BASE_LOOKUP6=app.aiLookup,BASE_AIASK6=app.aiAsk,BASE_AIJSON6=app.aiJSON,BASE_SETTINGS6=app.openSettings;
 function copyTextSync(t){
  try{if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(t);return true;}}catch(e){}
  try{const ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;top:-1000px;opacity:0';document.body.appendChild(ta);ta.select();const ok=document.execCommand('copy');ta.remove();return ok;}catch(e){return false;}
@@ -3013,6 +3012,7 @@ const GEM_OK=n=>/^gemini-(\d+(?:\.\d+)?)-(flash|flash-lite|pro)(-latest|-preview
 const gemRank=n=>{const v=(n.match(/gemini-(\d+(?:\.\d+)?)/)||[0,0])[1]*1;const pre=/preview|exp/.test(n);let r=/flash-lite/.test(n)?600:/flash/.test(n)?1000:/pro/.test(n)?100:0;if(/^gemini-flash-latest$/.test(n))r=1000+v;if(/^gemini-flash-lite-latest$/.test(n))r=600;return r+v*10-(pre?300:0)-(/-latest$/.test(n)&&v?5:0);};
 const sleepMs=ms=>new Promise(r=>setTimeout(r,ms));
 Object.assign(app,{
+ async aiPlanAdvice(){if(!this.data.prefs.plan||!$('plan-ai')){this.toast('Hãy tạo và lưu kế hoạch trước, rồi nhờ AI gợi ý','error');if(this.view!=='plan')this.go('plan');return;}return BASE_ADVICE6.call(this);},
  async listGeminiModels(){
   const r=await this.gemFetch('models?pageSize=200');const js=await r.json().catch(()=>({}));
   if(!r.ok)throw new Error(/API key not valid|API_KEY_INVALID/i.test(JSON.stringify(js))?'Gemini API key không hợp lệ.':'Không đọc được danh sách mô hình ('+r.status+').');
