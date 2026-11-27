@@ -600,8 +600,8 @@ const app={
  streak(){let n=0;const d=new Date();const has=k=>{const x=this.dayStat(k);return x&&(x.r||x.pron);};if(!has(dayKey(d)))d.setDate(d.getDate()-1);while(has(dayKey(d))){n++;d.setDate(d.getDate()-1);}return n;},
 
  /* ---------- Theme / sound / accent ---------- */
- initTheme(){const t=localStorage.getItem(THEME_KEY);const dark=t?t==='dark':window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.classList.toggle('dark',!!dark);},
- toggleTheme(){const d=document.documentElement.classList.toggle('dark');localStorage.setItem(THEME_KEY,d?'dark':'light');},
+ initTheme(){setTimeout(syncThemeColor,0);const t=localStorage.getItem(THEME_KEY);const dark=t?t==='dark':window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches;document.documentElement.classList.toggle('dark',!!dark);},
+ toggleTheme(){const d=document.documentElement.classList.toggle('dark');syncThemeColor();localStorage.setItem(THEME_KEY,d?'dark':'light');},
  setAccent(a){this.data.prefs.accent=a;this.save();this.updateAccentBtn();if(this.view==='study'&&this.mode==='speak'&&this.spk){this.spk.result=null;this.renderSpeak();}},
  toggleAccent(){this.setAccent(this.accent==='uk'?'us':'uk');this.toast(this.accent==='uk'?'Giọng mặc định: Anh – Anh (UK)':'Giọng mặc định: Anh – Mỹ (US)');},
  updateAccentBtn(){const b=$('accent-btn');if(b)b.textContent=this.accent.toUpperCase();},
@@ -1323,6 +1323,7 @@ window.app=app;
  * PHẦN MỞ RỘNG v4: biểu tượng, thư mục, nhập file 2 cột, AI tra từ điển,
  * kế hoạch học cá nhân
  * ===================================================================== */
+function syncThemeColor(){const m=document.querySelector('meta[name=theme-color]');if(m)m.setAttribute('content',document.documentElement.classList.contains('dark')?'#171613':'#f7f5f0');}
 function icoSvg(k,cls){const x=ICONS[k];if(!x||!x.svg)return'';const big=/\bw-(7|8|9|10|11|12|14|16)\b/.test(cls);return`<svg class="ico ${cls} shrink-0 select-none${big?' fi-lg':''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">${x.svg}</svg>`;}
 function ico(k,cls='w-6 h-6'){return icoSvg(k,cls);}
 const LEVELS=['A1','A2','B1','B2','C1','C2'];
@@ -1817,7 +1818,7 @@ const FA_MAP={'fa-volume-high':'pron','fa-plus':'plus','fa-book-open':'openbook'
 function iconify(root){
  if(!root||!root.querySelectorAll)return;
  root.querySelectorAll('i.fa-solid').forEach(i=>{const cls=[...i.classList];const fa=cls.find(c=>c.startsWith('fa-')&&c!=='fa-solid');const k=FA_MAP[fa];if(!k||!ICONS[k])return;
-  const t=document.createElement('template');t.innerHTML=icoSvg(k,'fi '+cls.filter(c=>!c.startsWith('fa-')&&!/^(text-(xs|sm|base|lg|xl|2xl|3xl|\[)|opacity-)/.test(c)).join(' '));i.replaceWith(t.content.firstChild);});
+  const t=document.createElement('template');t.innerHTML=icoSvg(k,'');const sv=t.content.firstChild;sv.setAttribute('class','ico fi shrink-0 select-none '+cls.filter(c=>!c.startsWith('fa-')&&!/^(text-(xs|sm|base|lg|xl|2xl|3xl|\[)|opacity-)/.test(c)).join(' '));i.replaceWith(sv);});
 }
 function startIconObserver(){iconify(document.body);new MutationObserver(ms=>{ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType!==1)return;if(n.matches&&n.matches('i.fa-solid'))iconify(n.parentNode);else iconify(n);}));}).observe(document.body,{childList:true,subtree:true});}
 
