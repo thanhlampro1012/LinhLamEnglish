@@ -132,6 +132,7 @@
  ::-webkit-scrollbar-thumb{background:#c9c2b3}
  kbd{border-color:var(--line)}
  .accent-indigo-600{accent-color:var(--accent)}
+ .ss-all{margin-top:14px;border-top:1px solid var(--line);padding-top:10px;font-size:13px}.ss-all summary{cursor:pointer;color:var(--muted)}.ss-all-list{display:grid;grid-template-columns:1fr auto;gap:6px 12px;margin-top:8px}.ss-all-list span{color:var(--muted);font-variant-numeric:tabular-nums}.ss-all-list .ss-link{text-align:left}
  /* Buổi hôm nay */
  .ss-panel{padding:18px 20px;display:flex;flex-direction:column;gap:16px}
  .ss-main{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:flex-start}
@@ -3478,6 +3479,8 @@ const parseDay=k=>{const [y,m,d]=k.split('-').map(Number);return new Date(y,m-1,
 const addDays=(k,n)=>{const d=parseDay(k);d.setDate(d.getDate()+n);return dayKey(d);};
 const WD=['CN','T2','T3','T4','T5','T6','T7'];
 const fmtDay=k=>{const d=parseDay(k);return `${WD[d.getDay()]} ${pad2(d.getDate())}/${pad2(d.getMonth()+1)}`;};
+/* Lịch học theo giờ Việt Nam, không theo múi giờ của máy */
+const vnToday=()=>{try{return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}catch(e){return dayKey();}};
 const sessionNo=k=>Math.round((parseDay(k)-parseDay(LESSON_START))/864e5)+1;
 
 /* Bộ từ của từng buổi được thêm vào kho có sẵn: tiến độ lưu và đồng bộ như các bộ khác */
@@ -3490,27 +3493,39 @@ TYPE_LABEL.session='Buổi học';
 Object.assign(app,{
  lessonSet(L){return this.sets.find(s=>s.id===lessonSetId(L));},
  sessionPanelHtml(){
-  const today=dayKey(),n=sessionNo(today);
+  const today=vnToday(),n=sessionNo(today);
   const L=LESSONS.find(x=>x.date===today);
   const set=L&&this.lessonSet(L);
   const seen=set?set.cards.filter(c=>c.srs.seen).length:0;
-  const reviews=REVIEW_GAPS.map(g=>{const R=LESSONS.find(x=>x.date===addDays(today,-g));const s=R&&this.lessonSet(R);return s?{g,R,s}:null;}).filter(Boolean);
+  const gaps=L&&L.review?[...new Set([1,2,3,4,5,6,...REVIEW_GAPS])].sort((a,b)=>a-b):REVIEW_GAPS;
+  const reviews=gaps.map(g=>{const R=LESSONS.find(x=>x.date===addDays(today,-g));const s=R&&this.lessonSet(R);return s?{g,R,s}:null;}).filter(Boolean);
   const revIds=reviews.flatMap(r=>r.s.cards.map(c=>c.id));
   const first=LESSONS.length?LESSONS[0].date:today;
   const weekStart=today<first?first:addDays(today,-((parseDay(today).getDay()+6)%7));
-  const week=[0,1,2,3,4,5,6].map(i=>{const k=addDays(weekStart,i);const X=LESSONS.find(x=>x.date===k);const s=X&&this.lessonSet(X);return{k,X,s,done:s&&s.cards.every(c=>c.srs.seen)};});
+  const week=[0,1,2,3,4,5,6].map(i=>{const k=addDays(weekStart,i);const X=LESSONS.find(x=>x.date===k);const s=X&&this.lessonSet(X);return{k,X,s,done:!!(s&&s.cards.length&&s.cards.every(c=>c.srs.seen))};});
   let head;
   if(today<first)head=`<p class="ss-kicker">Sắp bắt đầu</p><h2 class="ss-title">Buổi 01 · ${esc(fmtDay(first))}</h2>`;
   else if(L)head=`<p class="ss-kicker">Buổi hôm nay · ${esc(fmtDay(today))} · 5:00–7:00</p><h2 class="ss-title">Buổi ${pad2(L.so)} · ${esc(L.title)}</h2><p class="ss-sub">Ngữ pháp: ${esc(L.grammar)}</p>`;
   else head=`<p class="ss-kicker">Buổi hôm nay · ${esc(fmtDay(today))} · 5:00–7:00</p><h2 class="ss-title">Buổi ${pad2(n)}</h2><p class="ss-sub">Danh sách từ của buổi này chưa được thêm vào web.</p>`;
   const words=L?`<div class="ss-words">${L.words.map(w=>`<span>${esc(w[0])}</span>`).join('')}</div>
    <div class="ss-actions"><button class="btn-primary" onclick="app.openSet('${lessonSetId(L)}')">${L.review?'Học 8 từ nối':'Học 8 từ mới'}</button><span class="ss-note">${seen}/${set.cards.length} từ đã học</span></div>`:'';
-  const rev=reviews.length?`<div class="ss-review"><p class="ss-label">Ôn đầu buổi</p><p class="ss-rev-list">${reviews.map(r=>`<button class="ss-link" onclick="app.openSet('${r.s.id}')">Buổi ${pad2(r.R.so)}</button> <span>(${r.g} ngày)</span>`).join(' · ')}</p>
+  const rev=reviews.length?`<div class="ss-review"><p class="ss-label">${L&&L.review?'Ôn cả tuần':'Ôn đầu buổi'}</p><p class="ss-rev-list">${reviews.map(r=>`<button class="ss-link" onclick="app.openSet('${r.s.id}')">Buổi ${pad2(r.R.so)}</button> <span>(${r.g} ngày)</span>`).join(' · ')}</p>
    <button class="btn-soft" onclick="app.startReview(${esc(JSON.stringify(revIds))})">Ôn ${revIds.length} từ</button></div>`:'';
   const strip=`<div class="ss-week">${week.map(d=>`<button class="ss-day${d.k===today?' on':''}${d.done?' done':''}" ${d.s?`onclick="app.openSet('${d.s.id}')"`:'disabled'} title="${d.X?esc('Buổi '+pad2(d.X.so)+' · '+d.X.title):'Chưa có danh sách từ'}"><b>${esc(fmtDay(d.k).split(' ')[0])}</b><span>${esc(fmtDay(d.k).split(' ')[1])}</span><i>${d.X?pad2(d.X.so):'–'}</i></button>`).join('')}</div>`;
-  return `<section class="card ss-panel"><div class="ss-main"><div class="ss-left">${head}${words}</div>${rev}</div>${strip}</section>`;
+  const past=LESSONS.filter(x=>x.date<=today||today<first);
+  const all=past.length?`<details class="ss-all"><summary>Tất cả buổi đã có (${past.length})</summary><div class="ss-all-list">${past.map(x=>{const s=this.lessonSet(x);if(!s)return'';const k=s.cards.filter(c=>c.srs.seen).length;return`<button class="ss-link" onclick="app.openSet('${s.id}')">Buổi ${pad2(x.so)} · ${esc(x.title)}</button><span>${esc(fmtDay(x.date))} · ${k}/${s.cards.length}</span>`;}).join('')}</div></details>`:'';
+  return `<section class="card ss-panel"><div class="ss-main"><div class="ss-left">${head}${words}</div>${rev}</div>${strip}${all}</section>`;
  }
 });
+/* "Khôi phục bộ có sẵn" chỉ áp dụng cho bộ A1→C2: tiến độ các buổi học được giữ */
+const isSessionCard=id=>String(id).startsWith('p-buoi-');
+const SESSION_BASE_RESTORE=app.restore;
+app.restore=function(snap){const d=SESSION_BASE_RESTORE.apply(this,arguments);const prog=(snap&&snap.progress)||{};
+ d.sets.forEach(s=>{if(s.type!=='session')return;s.cards.forEach(c=>{const p=prog[c.id];if(p&&isSessionCard(c.id))this.unpackP(c,p);});});return d;};
+app.confirmResetPresets=function(){this.confirm('Khôi phục bộ từ có sẵn?','Các bộ A1→C2 sẽ trở về nội dung gốc và mất tiến độ học của các bộ đó. Học phần của bạn và tiến độ các buổi học được giữ nguyên.',()=>{
+ const keep=this.sets.filter(s=>s.type==='session'),ids=new Set(keep.map(s=>s.id));const fresh=buildPresetSets().filter(s=>!ids.has(s.id));
+ const now=Date.now();keep.forEach(s=>s.cards.forEach(c=>{if(c.srs.seen||c.pron.tries||c.srs.last)c.srs.last=Math.max(c.srs.last||0,now);}));
+ this.data.sets=this.sets.filter(s=>!s.preset).concat(fresh,keep);this.data.presetResetAt=now;this.persist();this.renderLibrary();this.toast('Đã khôi phục bộ từ có sẵn','success');});};
 const SESSION_BASE_LIBRARY=app.renderLibrary;
 app.renderLibrary=function(){SESSION_BASE_LIBRARY.apply(this,arguments);const root=$('view-library')&&$('view-library').firstElementChild;if(!root)return;
  const wrap=document.createElement('div');wrap.innerHTML=this.sessionPanelHtml();const banner=root.querySelector(':scope > button.card');root.insertBefore(wrap.firstElementChild,banner?banner.nextSibling:root.firstChild);};
