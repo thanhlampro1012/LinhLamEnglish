@@ -132,6 +132,31 @@
  ::-webkit-scrollbar-thumb{background:#c9c2b3}
  kbd{border-color:var(--line)}
  .accent-indigo-600{accent-color:var(--accent)}
+ .ss-all{margin-top:14px;border-top:1px solid var(--line);padding-top:10px;font-size:13px}.ss-all summary{cursor:pointer;color:var(--muted)}.ss-all-list{display:grid;grid-template-columns:1fr auto;gap:6px 12px;margin-top:8px}.ss-all-list span{color:var(--muted);font-variant-numeric:tabular-nums}.ss-all-list .ss-link{text-align:left}
+ /* Buổi hôm nay */
+ .ss-panel{padding:18px 20px;display:flex;flex-direction:column;gap:16px}
+ .ss-main{display:flex;flex-wrap:wrap;gap:16px 28px;align-items:flex-start}
+ .ss-left{flex:1 1 320px;min-width:0}
+ .ss-kicker{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+ .ss-title{font-size:1.35rem;line-height:1.25;margin-top:4px}
+ .ss-sub{font-size:.875rem;color:var(--ink-2);margin-top:2px}
+ .ss-words{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+ .ss-words span{font-family:var(--serif);font-size:15px;padding:2px 9px;border:1px solid var(--line);border-radius:4px;background:var(--paper)}
+ .ss-actions{display:flex;align-items:center;gap:12px;margin-top:14px;flex-wrap:wrap}
+ .ss-note{font-size:13px;color:var(--muted)}
+ .ss-review{flex:0 1 260px;border-left:1px solid var(--line);padding-left:20px;display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+ .ss-label{font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+ .ss-rev-list{font-size:14px;color:var(--ink-2)}
+ .ss-link{color:var(--accent);font-weight:600;text-decoration:underline;text-underline-offset:2px}
+ .ss-week{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px;border-top:1px solid var(--line);padding-top:14px}
+ .ss-day{display:flex;flex-direction:column;align-items:center;gap:1px;padding:6px 2px;border-radius:6px;border:1px solid transparent;font-size:12px;color:var(--ink-2)}
+ .ss-day b{font-weight:600}.ss-day span{color:var(--muted);font-size:11px}.ss-day i{font-style:normal;font-family:var(--serif);font-size:15px;margin-top:2px}
+ .ss-day:not(:disabled):hover{border-color:var(--line)}
+ .ss-day:disabled{opacity:.45;cursor:default}
+ .ss-day.on{border-color:var(--accent);color:var(--ink)}
+ .ss-day.done i{color:#2c6a45}.ss-day.done i::after{content:' ✓';font-family:inherit;font-size:12px}
+ .dark .ss-day.done i{color:#8cc4a0}
+ @media (max-width:640px){.ss-panel{padding:16px}.ss-review{border-left:0;padding-left:0;border-top:1px solid var(--line);padding-top:12px;flex-basis:100%}}
 
 </style>
 </head>
@@ -3372,6 +3397,138 @@ Object.assign(app,{
  }
 });
 
+</script>
+<script>
+/* =====================================================================
+ * HỌC THEO BUỔI — khớp lộ trình IELTS (mỗi sáng 5:00–7:00, T2–CN)
+ * Mỗi buổi T2–T7: 8 từ mới; CN: 8 từ nối + ôn cả tuần.
+ * Ôn cách quãng theo lộ trình: buổi cách đây 1, 3, 7, 14 ngày.
+ * Thêm tuần mới: nối thêm phần tử vào LESSONS (date theo giờ Việt Nam).
+ * Từ: [từ, loại từ, IPA UK, IPA US, nghĩa, ví dụ] — phiên âm theo cách ghi của Cambridge.
+ * ===================================================================== */
+const LESSON_START='2026-11-23';
+const REVIEW_GAPS=[1,3,7,14];
+const LESSONS=[
+ {so:1,date:'2026-11-23',title:'Đăng ký thành viên và đi lại',grammar:'Hiện tại đơn và hiện tại tiếp diễn',words:[
+  ['membership','n','/ˈmem.bə.ʃɪp/','/ˈmem.bɚ.ʃɪp/','[n] tư cách thành viên, việc là hội viên',"I'd like to apply for membership of the sports centre."],
+  ['discount','n','/ˈdɪs.kaʊnt/','/ˈdɪs.kaʊnt/','[n] khoản giảm giá','Students get a ten percent discount on all tickets.'],
+  ['recommend','v','/ˌrek.əˈmend/','/ˌrek.əˈmend/','[v] giới thiệu, khuyên nên dùng hoặc nên làm','My friend recommended this gym to me.'],
+  ['convenient','adj','/kənˈviː.ni.ənt/','/kənˈviː.njənt/','[adj] tiện lợi, thuận tiện','The night train is convenient because it arrives in the city centre.'],
+  ['avoid','v','/əˈvɔɪd/','/əˈvɔɪd/','[v] tránh, né','Many young people try to avoid short flights.'],
+  ['concern','n','/kənˈsɜːn/','/kənˈsɝːn/','[n] mối lo ngại, sự quan ngại','There is growing concern about air pollution in big cities.'],
+  ['invest','v','/ɪnˈvest/','/ɪnˈvest/','[v] đầu tư','The company has invested in new trains.'],
+  ['depend','v','/dɪˈpend/','/dɪˈpend/','[v] phụ thuộc, tùy thuộc (depend on)','The price depends on the season.']]},
+ {so:2,date:'2026-11-24',title:'Công việc và học tập',grammar:'Quá khứ đơn',words:[
+  ['career','n','/kəˈrɪər/','/kəˈrɪr/','[n] sự nghiệp','She wants to build a career in teaching.'],
+  ['colleague','n','/ˈkɒl.iːɡ/','/ˈkɑː.liːɡ/','[n] đồng nghiệp','I had lunch with my colleagues yesterday.'],
+  ['deadline','n','/ˈded.laɪn/','/ˈded.laɪn/','[n] hạn chót','I finished the report just before the deadline.'],
+  ['flexible','adj','/ˈflek.sə.bəl/','/ˈflek.sə.bəl/','[adj] linh hoạt','Many companies now offer flexible working hours.'],
+  ['pressure','n','/ˈpreʃ.ər/','/ˈpreʃ.ɚ/','[n] áp lực','Students are often under a lot of pressure before exams.'],
+  ['achieve','v','/əˈtʃiːv/','/əˈtʃiːv/','[v] đạt được','She achieved her goal of winning a scholarship.'],
+  ['skill','n','/skɪl/','/skɪl/','[n] kỹ năng','Communication is an important skill at work.'],
+  ['balance','n','/ˈbæl.əns/','/ˈbæl.əns/','[n] sự cân bằng','It is hard to find a good balance between work and study.']]},
+ {so:3,date:'2026-11-25',title:'Sức khỏe và lối sống',grammar:'Hiện tại hoàn thành và quá khứ đơn',words:[
+  ['habit','n','/ˈhæb.ɪt/','/ˈhæb.ɪt/','[n] thói quen','Eating late at night is a bad habit.'],
+  ['diet','n','/ˈdaɪ.ət/','/ˈdaɪ.ət/','[n] chế độ ăn uống','A healthy diet includes plenty of vegetables.'],
+  ['regularly','adv','/ˈreɡ.jə.lə.li/','/ˈreɡ.jə.lɚ.li/','[adv] đều đặn, thường xuyên','I have exercised regularly since last year.'],
+  ['reduce','v','/rɪˈdʒuːs/','/rɪˈduːs/','[v] giảm, làm giảm','Walking every day can reduce stress.'],
+  ['benefit','n','/ˈben.ɪ.fɪt/','/ˈben.ə.fɪt/','[n] lợi ích','Regular exercise has many health benefits.'],
+  ['affect','v','/əˈfekt/','/əˈfekt/','[v] ảnh hưởng đến','Lack of sleep can affect your concentration.'],
+  ['harmful','adj','/ˈhɑːm.fəl/','/ˈhɑːrm.fəl/','[adj] có hại','Smoking is harmful to your health.'],
+  ['maintain','v','/meɪnˈteɪn/','/meɪnˈteɪn/','[v] duy trì, giữ','It is important to maintain a healthy weight.']]},
+ {so:4,date:'2026-11-26',title:'Thành phố và môi trường',grammar:'So sánh hơn và so sánh nhất',words:[
+  ['environment','n','/ɪnˈvaɪ.rən.mənt/','/ɪnˈvaɪ.rən.mənt/','[n] môi trường','Cars and factories damage the environment.'],
+  ['pollution','n','/pəˈluː.ʃən/','/pəˈluː.ʃən/','[n] sự ô nhiễm','Air pollution in Hanoi is worse in winter.'],
+  ['congestion','n','/kənˈdʒes.tʃən/','/kənˈdʒes.tʃən/','[n] sự tắc nghẽn (giao thông)','Traffic congestion is a serious problem in big cities.'],
+  ['sustainable','adj','/səˈsteɪ.nə.bəl/','/səˈsteɪ.nə.bəl/','[adj] bền vững','Cities need more sustainable forms of transport.'],
+  ['resident','n','/ˈrez.ɪ.dənt/','/ˈrez.ə.dənt/','[n] cư dân','Local residents complained about the noise.'],
+  ['crowded','adj','/ˈkraʊ.dɪd/','/ˈkraʊ.dɪd/','[adj] đông đúc','Buses are more crowded than they used to be.'],
+  ['facility','n','/fəˈsɪl.ə.ti/','/fəˈsɪl.ə.t̬i/','[n] cơ sở vật chất, tiện ích (thường dùng số nhiều)','The city has excellent sports facilities.'],
+  ['improve','v','/ɪmˈpruːv/','/ɪmˈpruːv/','[v] cải thiện','Public transport has improved a lot in recent years.']]},
+ {so:5,date:'2026-11-27',title:'Công nghệ và truyền thông',grammar:'Câu điều kiện loại 0, 1, 2',words:[
+  ['device','n','/dɪˈvaɪs/','/dɪˈvaɪs/','[n] thiết bị','Most teenagers use more than one device every day.'],
+  ['access','n, v','/ˈæk.ses/','/ˈæk.ses/','[n] quyền truy cập, sự tiếp cận; [v] truy cập','Not everyone has access to the internet.'],
+  ['rely','v','/rɪˈlaɪ/','/rɪˈlaɪ/','[v] dựa vào, phụ thuộc vào (rely on)','Many people rely on their phones for directions.'],
+  ['communicate','v','/kəˈmjuː.nɪ.keɪt/','/kəˈmjuː.nə.keɪt/','[v] giao tiếp, liên lạc','We communicate with our family through video calls.'],
+  ['addicted','adj','/əˈdɪk.tɪd/','/əˈdɪk.tɪd/','[adj] nghiện (addicted to)','If you are addicted to your phone, you will find it hard to focus.'],
+  ['advantage','n','/ədˈvɑːn.tɪdʒ/','/ədˈvæn.t̬ɪdʒ/','[n] lợi thế, ưu điểm','One advantage of online learning is flexibility.'],
+  ['drawback','n','/ˈdrɔː.bæk/','/ˈdrɑː.bæk/','[n] nhược điểm, hạn chế','The main drawback of social media is the loss of privacy.'],
+  ['privacy','n','/ˈprɪv.ə.si/','/ˈpraɪ.və.si/','[n] sự riêng tư','If apps collected less data, our privacy would be safer.']]},
+ {so:6,date:'2026-11-28',title:'Thời gian rảnh và sở thích',grammar:'V-ing hay to V',words:[
+  ['leisure','n','/ˈleʒ.ər/','/ˈliː.ʒɚ/','[n] thời gian rảnh, sự thư giãn','What do you enjoy doing in your leisure time?'],
+  ['entertainment','n','/ˌen.təˈteɪn.mənt/','/ˌen.t̬ɚˈteɪn.mənt/','[n] sự giải trí, chương trình giải trí','The city offers plenty of entertainment for young people.'],
+  ['outdoor','adj','/ˌaʊtˈdɔːr/','/ˈaʊt.dɔːr/','[adj] ngoài trời','I prefer outdoor activities such as hiking.'],
+  ['spare','adj','/speər/','/sper/','[adj] rảnh, dư ra (spare time)','I spend most of my spare time reading.'],
+  ['prefer','v','/prɪˈfɜːr/','/prɪˈfɝː/','[v] thích hơn (prefer A to B)','I prefer swimming to running.'],
+  ['involve','v','/ɪnˈvɒlv/','/ɪnˈvɑːlv/','[v] bao gồm, đòi hỏi (involve doing)','My job involves travelling a lot.'],
+  ['encourage','v','/ɪnˈkʌr.ɪdʒ/','/ɪnˈkɝː.ɪdʒ/','[v] khuyến khích (encourage sb to do)','My parents encouraged me to take up a sport.'],
+  ['physical','adj','/ˈfɪz.ɪ.kəl/','/ˈfɪz.ɪ.kəl/','[adj] (thuộc) thể chất','Physical activity is good for both body and mind.']]},
+ {so:7,date:'2026-11-29',title:'Ôn tuần và kiểm tra nhỏ',grammar:'Mạo từ, danh từ đếm được và không đếm được',review:true,words:[
+  ['however','adv','/haʊˈev.ər/','/haʊˈev.ɚ/','[adv] tuy nhiên','Online courses are cheap. However, they require self-discipline.'],
+  ['therefore','adv','/ˈðeə.fɔːr/','/ˈðer.fɔːr/','[adv] vì vậy, do đó','The roads are crowded; therefore, many people use the metro.'],
+  ['in addition','phr','/ɪn əˈdɪʃ.ən/','/ɪn əˈdɪʃ.ən/','[phr] ngoài ra, thêm vào đó','In addition, cycling is good for your health.'],
+  ['for example','phr','/fər ɪɡˈzɑːm.pəl/','/fɚ ɪɡˈzæm.pəl/','[phr] ví dụ','Some sports, for example tennis, are expensive to play.'],
+  ['although','conj','/ɔːlˈðəʊ/','/ɑːlˈðoʊ/','[conj] mặc dù','Although the city is crowded, it has many green spaces.'],
+  ['whereas','conj','/weəˈræz/','/werˈæz/','[conj] trong khi (đối lập)','Rural areas are quiet, whereas cities are noisy.'],
+  ['as a result','phr','/əz ə rɪˈzʌlt/','/əz ə rɪˈzʌlt/','[phr] do đó, kết quả là','Traffic has increased. As a result, the air is more polluted.'],
+  ['on the other hand','phr','/ɒn ðə ˈʌð.ər ˌhænd/','/ɑːn ðə ˈʌð.ɚ ˌhænd/','[phr] mặt khác','On the other hand, working from home can feel lonely.']]}
+];
+const pad2=n=>String(n).padStart(2,'0');
+const lessonSetId=L=>'preset-buoi-'+pad2(L.so);
+const parseDay=k=>{const [y,m,d]=k.split('-').map(Number);return new Date(y,m-1,d);};
+const addDays=(k,n)=>{const d=parseDay(k);d.setDate(d.getDate()+n);return dayKey(d);};
+const WD=['CN','T2','T3','T4','T5','T6','T7'];
+const fmtDay=k=>{const d=parseDay(k);return `${WD[d.getDay()]} ${pad2(d.getDate())}/${pad2(d.getMonth()+1)}`;};
+/* Lịch học theo giờ Việt Nam, không theo múi giờ của máy */
+const vnToday=()=>{try{return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}catch(e){return dayKey();}};
+const sessionNo=k=>Math.round((parseDay(k)-parseDay(LESSON_START))/864e5)+1;
+
+/* Bộ từ của từng buổi được thêm vào kho có sẵn: tiến độ lưu và đồng bộ như các bộ khác */
+const BASE_PRESET_SETS=buildPresetSets;
+buildPresetSets=function(){return BASE_PRESET_SETS().concat(LESSONS.map(L=>({id:lessonSetId(L),preset:true,level:'',type:'session',topic:'',icon:'calendar',
+ title:`Buổi ${pad2(L.so)} · ${L.title}`,category:'Buổi học',description:`${fmtDay(L.date)} · ${L.grammar}`,bestMatchTime:null,
+ cards:L.words.map(w=>normalizeCard({...W(...w),id:'p-buoi-'+pad2(L.so)+'-'+w[0].toLowerCase().replace(/\s+/g,'-')}))})));};
+TYPE_LABEL.session='Buổi học';
+
+Object.assign(app,{
+ lessonSet(L){return this.sets.find(s=>s.id===lessonSetId(L));},
+ sessionPanelHtml(){
+  const today=vnToday(),n=sessionNo(today);
+  const L=LESSONS.find(x=>x.date===today);
+  const set=L&&this.lessonSet(L);
+  const seen=set?set.cards.filter(c=>c.srs.seen).length:0;
+  const gaps=L&&L.review?[...new Set([1,2,3,4,5,6,...REVIEW_GAPS])].sort((a,b)=>a-b):REVIEW_GAPS;
+  const reviews=gaps.map(g=>{const R=LESSONS.find(x=>x.date===addDays(today,-g));const s=R&&this.lessonSet(R);return s?{g,R,s}:null;}).filter(Boolean);
+  const revIds=reviews.flatMap(r=>r.s.cards.map(c=>c.id));
+  const first=LESSONS.length?LESSONS[0].date:today;
+  const weekStart=today<first?first:addDays(today,-((parseDay(today).getDay()+6)%7));
+  const week=[0,1,2,3,4,5,6].map(i=>{const k=addDays(weekStart,i);const X=LESSONS.find(x=>x.date===k);const s=X&&this.lessonSet(X);return{k,X,s,done:!!(s&&s.cards.length&&s.cards.every(c=>c.srs.seen))};});
+  let head;
+  if(today<first)head=`<p class="ss-kicker">Sắp bắt đầu</p><h2 class="ss-title">Buổi 01 · ${esc(fmtDay(first))}</h2>`;
+  else if(L)head=`<p class="ss-kicker">Buổi hôm nay · ${esc(fmtDay(today))} · 5:00–7:00</p><h2 class="ss-title">Buổi ${pad2(L.so)} · ${esc(L.title)}</h2><p class="ss-sub">Ngữ pháp: ${esc(L.grammar)}</p>`;
+  else head=`<p class="ss-kicker">Buổi hôm nay · ${esc(fmtDay(today))} · 5:00–7:00</p><h2 class="ss-title">Buổi ${pad2(n)}</h2><p class="ss-sub">Danh sách từ của buổi này chưa được thêm vào web.</p>`;
+  const words=L?`<div class="ss-words">${L.words.map(w=>`<span>${esc(w[0])}</span>`).join('')}</div>
+   <div class="ss-actions"><button class="btn-primary" onclick="app.openSet('${lessonSetId(L)}')">${L.review?'Học 8 từ nối':'Học 8 từ mới'}</button><span class="ss-note">${seen}/${set.cards.length} từ đã học</span></div>`:'';
+  const rev=reviews.length?`<div class="ss-review"><p class="ss-label">${L&&L.review?'Ôn cả tuần':'Ôn đầu buổi'}</p><p class="ss-rev-list">${reviews.map(r=>`<button class="ss-link" onclick="app.openSet('${r.s.id}')">Buổi ${pad2(r.R.so)}</button> <span>(${r.g} ngày)</span>`).join(' · ')}</p>
+   <button class="btn-soft" onclick="app.startReview(${esc(JSON.stringify(revIds))})">Ôn ${revIds.length} từ</button></div>`:'';
+  const strip=`<div class="ss-week">${week.map(d=>`<button class="ss-day${d.k===today?' on':''}${d.done?' done':''}" ${d.s?`onclick="app.openSet('${d.s.id}')"`:'disabled'} title="${d.X?esc('Buổi '+pad2(d.X.so)+' · '+d.X.title):'Chưa có danh sách từ'}"><b>${esc(fmtDay(d.k).split(' ')[0])}</b><span>${esc(fmtDay(d.k).split(' ')[1])}</span><i>${d.X?pad2(d.X.so):'–'}</i></button>`).join('')}</div>`;
+  const past=LESSONS.filter(x=>x.date<=today||today<first);
+  const all=past.length?`<details class="ss-all"><summary>Tất cả buổi đã có (${past.length})</summary><div class="ss-all-list">${past.map(x=>{const s=this.lessonSet(x);if(!s)return'';const k=s.cards.filter(c=>c.srs.seen).length;return`<button class="ss-link" onclick="app.openSet('${s.id}')">Buổi ${pad2(x.so)} · ${esc(x.title)}</button><span>${esc(fmtDay(x.date))} · ${k}/${s.cards.length}</span>`;}).join('')}</div></details>`:'';
+  return `<section class="card ss-panel"><div class="ss-main"><div class="ss-left">${head}${words}</div>${rev}</div>${strip}${all}</section>`;
+ }
+});
+/* "Khôi phục bộ có sẵn" chỉ áp dụng cho bộ A1→C2: tiến độ các buổi học được giữ */
+const isSessionCard=id=>String(id).startsWith('p-buoi-');
+const SESSION_BASE_RESTORE=app.restore;
+app.restore=function(snap){const d=SESSION_BASE_RESTORE.apply(this,arguments);const prog=(snap&&snap.progress)||{};
+ d.sets.forEach(s=>{if(s.type!=='session')return;s.cards.forEach(c=>{const p=prog[c.id];if(p&&isSessionCard(c.id))this.unpackP(c,p);});});return d;};
+app.confirmResetPresets=function(){this.confirm('Khôi phục bộ từ có sẵn?','Các bộ A1→C2 sẽ trở về nội dung gốc và mất tiến độ học của các bộ đó. Học phần của bạn và tiến độ các buổi học được giữ nguyên.',()=>{
+ const keep=this.sets.filter(s=>s.type==='session'),ids=new Set(keep.map(s=>s.id));const fresh=buildPresetSets().filter(s=>!ids.has(s.id));
+ const now=Date.now();keep.forEach(s=>s.cards.forEach(c=>{if(c.srs.seen||c.pron.tries||c.srs.last)c.srs.last=Math.max(c.srs.last||0,now);}));
+ this.data.sets=this.sets.filter(s=>!s.preset).concat(fresh,keep);this.data.presetResetAt=now;this.persist();this.renderLibrary();this.toast('Đã khôi phục bộ từ có sẵn','success');});};
+const SESSION_BASE_LIBRARY=app.renderLibrary;
+app.renderLibrary=function(){SESSION_BASE_LIBRARY.apply(this,arguments);const root=$('view-library')&&$('view-library').firstElementChild;if(!root)return;
+ const wrap=document.createElement('div');wrap.innerHTML=this.sessionPanelHtml();const banner=root.querySelector(':scope > button.card');root.insertBefore(wrap.firstElementChild,banner?banner.nextSibling:root.firstChild);};
 </script>
 </body>
 </html>
